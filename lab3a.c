@@ -7,22 +7,46 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
+//hello mr.vertigo hope u are feeling better <3
+//it is thursday 10pm
+//some silly notes about my naming convention feel free to change to what u feel is best
+//using underscores for sizes/values and camelCase for structures
+
+int i;
 int ext2_fd;
-int block_size;
+int block_size, inode_size;
+int blocks_per_group, inodes_per_group;
+int num_blocks, num_inodes;
+int first_nonres_inode;
 char reportBuf[1024];
 struct ext2_super_block sb;
+struct ext2_group_desc groupDesc;
 
 void superblockSummary() {
 	block_size = EXT2_MIN_BLOCK_SIZE << sb.s_log_block_size; 
+	inode_size = sb.s_inode_size;
+	num_blocks = sb.s_blocks_count;
+	num_inodes = sb.s_inodes_count;
+	blocks_per_group = sb.s_blocks_per_group;
+	inodes_per_group = sb.s_inodes_per_group;
+	first_nonres_inode = sb.s_first_ino;
 	
-	sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d", "SUPERBLOCK", sb.s_blocks_count, sb.s_inodes_count, 
-			block_size, sb.s_inode_size, sb.s_blocks_per_group, sb.s_inodes_per_group, sb.s_first_ino);
+	pread(ext2_fd, &sb, sizeof(sb), 1024);
+	sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d", "SUPERBLOCK", num_blocks, num_inodes, 
+			block_size, inode_size, blocks_per_group, inodes_per_group, first_nonres_inode);
 	
 	printf("%s\n", reportBuf);
 }
 
-int main(int argc, char** argv) {
+void groupSummary() {
+	pread(ext2_fd, groupDesc, sizeof(groupDesc), 1024+block_size);
+	printf("%s:\n", 
+	for(i=0; i<1; i++) {
+		
+	}
+}
 
+int main(int argc, char** argv) {
 	
 	//-------------handle input argument----------------------
 	if (argc < 2 || strstr(argv[1], ".img")==NULL) {
@@ -33,11 +57,11 @@ int main(int argc, char** argv) {
 
 	ext2_fd = open("EXT2_test.img", O_RDONLY);   
 
-	pread(ext2_fd, &sb, sizeof(sb), 1024);
 	if (sb.s_magic != EXT2_SUPER_MAGIC)
 	    exit(1); 
 
 	//------------get summaries------------------------------
 	superblockSummary();
+	groupSummary();
 	
 }
