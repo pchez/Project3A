@@ -7,7 +7,7 @@ EXECNAME = lab3a
 CC = gcc
 DEBUG = -g
 LFLAGS = -Wall -Werror $(DEBUG) 
-TARCONTENTS = lab3a.c #TODO: Add to this
+TARCONTENTS = lab3a.c Makefile README ext2_fs.h
 TARNAME = lab3a_404159386_404616605.tar.gz  #TODO: Check this!
 
 

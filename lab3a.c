@@ -13,6 +13,11 @@
 //some silly notes about my naming convention feel free to change to what u feel is best
 //using underscores for sizes/values and camelCase for structures
 
+char reportBuf[1024];
+struct ext2_super_block sb;
+struct ext2_group_desc groupDesc;
+
+
 /* SUPER BLOCK VARIABLES */
 
 int i;
@@ -28,10 +33,10 @@ int free_blocks, free_inodes;
 int block_bitmap_blk_num, inode_bitmap_blk_num, first_inode_blk_num;
 int num_group;
 
-char reportBuf[1024];
-struct ext2_super_block sb;
-struct ext2_group_desc groupDesc;
+/* BLOCK BITMAP VARIABLES */
 
+char byte_buffer;
+int bit_mask, j;
 
 void superblockSummary() {
 	pread(ext2_fd, &sb, sizeof(sb), 1024);    
@@ -73,6 +78,48 @@ void groupSummary() {
 	printf("%s\n", reportBuf);
 }
 
+void checkFreeBlocks() {
+	memset(reportBuf, '\0', sizeof(char)*1024); // clear the array
+	//int count_check = 0;  // for de-bugging/sanity check purposes..
+	for(i = 0; i < block_size; i++) {
+		bit_mask = 1;
+		pread(ext2_fd, &byte_buffer, sizeof(byte_buffer), 1024 + block_size*2 + i);  // read in the byte
+		//  start at 3*1024 because boot table comes first, then super block, then group desciptor table, then bitmap blocks! :)
+		
+		for(j = 0; j < 8; j++) {
+			int check = byte_buffer & bit_mask;
+			if(check == 0) { // TODO: Check this is 0 is free or 1 is free...
+				sprintf(reportBuf, "%s,%d", "BFREE", (i * 8 + j));
+				printf("%s\n", reportBuf); 
+				//count_check++;
+			} 		
+			bit_mask <<= 1;
+		}
+	} // end of block for loop
+	//if(count_check == free_blocks)
+		//fprintf(stdout, "NUMBER OF FREE BLOCKS IS CORRECT\n");
+}
+
+void checkFreeInodes() {
+	//int count_check = 0;   // for de-bugging and sanity purposes...
+	for(i = 0; i < block_size; i++) {
+		bit_mask = 1;
+		pread(ext2_fd, &byte_buffer, sizeof(byte_buffer), 1024 + block_size*3 + i);
+
+		for(j = 0; j < 8; j++) {
+			int check = byte_buffer & bit_mask;
+			if(check == 0) {
+				sprintf(reportBuf, "%s,%d", "IFREE", (i * 8 + j));
+				printf("%s\n", reportBuf);
+				count_check++;
+			}
+			bit_mask <<= 1;
+		}
+	} // end of inode for loop
+	//if(count_check == free_inodes)
+		//fprintf(stdout, "NUMBER OF FREE INODES IS CORRECT\n");
+}
+
 int main(int argc, char** argv) {
 	//-------------handle input argument----------------------
 	if (argc < 2 || strstr(argv[1], ".img")==NULL) {
@@ -85,4 +132,6 @@ int main(int argc, char** argv) {
 	//------------get summaries------------------------------
 	superblockSummary();
 	groupSummary();
+	checkFreeBlocks();  // parse bitmap for blocks to check for BFREE blocks to print out
+	checkFreeInodes();  // parse bitmap for inodes to check for IFREE inodes to print out
 }
