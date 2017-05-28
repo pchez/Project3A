@@ -34,7 +34,14 @@ struct ext2_group_desc groupDesc;
 
 
 void superblockSummary() {
+<<<<<<< HEAD
 	pread(ext2_fd, &sb, sizeof(sb), 1024);	
+=======
+	pread(ext2_fd, &sb, sizeof(sb), 1024);
+	if (sb.s_magic != EXT2_SUPER_MAGIC)
+	    exit(1);
+	    
+>>>>>>> 2ff211fc37002bbd593c3f9b3a3b537eb83f8a63
 	block_size = EXT2_MIN_BLOCK_SIZE << sb.s_log_block_size; 
 	inode_size = sb.s_inode_size;
 	num_blocks = sb.s_blocks_count;
@@ -42,7 +49,11 @@ void superblockSummary() {
 	blocks_per_group = sb.s_blocks_per_group;
 	inodes_per_group = sb.s_inodes_per_group;
 	first_nonres_inode = sb.s_first_ino;
+<<<<<<< HEAD
 	
+=======
+  
+>>>>>>> 2ff211fc37002bbd593c3f9b3a3b537eb83f8a63
 	sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d", "SUPERBLOCK", num_blocks, num_inodes, 
 			block_size, inode_size, blocks_per_group, inodes_per_group, first_nonres_inode);
 	
@@ -54,6 +65,10 @@ void superblockSummary() {
 
 void groupSummary() {
 	pread(ext2_fd, &groupDesc, sizeof(groupDesc), 1024+block_size);
+<<<<<<< HEAD
+=======
+	
+>>>>>>> 2ff211fc37002bbd593c3f9b3a3b537eb83f8a63
 	num_group = 0;
 	//num_blocks also included here
 	//num_inodes also included here
@@ -63,10 +78,19 @@ void groupSummary() {
 	inode_bitmap_blk_num = groupDesc.bg_inode_bitmap;	
         first_inode_blk_num = groupDesc.bg_inode_table;	
 
+<<<<<<< HEAD
 	sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d,%d", "GROUP", num_group, num_blocks, 
 			num_inodes, free_blocks, free_inodes, block_bitmap_blk_num, inode_bitmap_blk_num,
 			first_inode_blk_num);
 
+=======
+	sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d,%d", "GROUP", num_group, blocks_per_group, 
+			inodes_per_group, free_blocks, free_inodes, block_bitmap_blk_num, inode_bitmap_blk_num,
+			first_inode_blk_num);
+
+	
+
+>>>>>>> 2ff211fc37002bbd593c3f9b3a3b537eb83f8a63
 	printf("%s\n", reportBuf);
 }
 
