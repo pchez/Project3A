@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <stdint.h>
+#include <time.h>
 
 //hello mr.vertigo hope u are feeling better <3
 //it is thursday 10pm
@@ -14,6 +15,7 @@
 //using underscores for sizes/values and camelCase for structures
 
 char reportBuf[1024];
+char output[30];  // output buffer for time! 
 struct ext2_super_block sb;
 struct ext2_group_desc groupDesc;
 struct ext2_inode inode;
@@ -40,10 +42,15 @@ int bit_mask, j;
 
 /* INODE VARIABLES */
 
-int inode_num, inode_file_type, inode_file_mode;
+int inode_num; 
+char inode_file_type;
+int inode_file_mode;
 int inode_file_owner, inode_file_group;
-int inode_link_count, inode_creation_time, inode_modification_time;
-int inode_last_access_time, inode_file_size, inode_num_blocks;
+int inode_link_count; 
+char * inode_creation_time; 
+char * inode_modification_time;
+char * inode_last_access_time; 
+int inode_file_size, inode_num_blocks;
 
 /* ------------------ START OF FUNCTIONS ---------------------------------- */
 
@@ -99,7 +106,7 @@ void checkFreeBlocks() {
 		
 		for(j = 0; j < 8; j++) {
 			int check = byte_buffer & bit_mask;
-			if(check == 0) { // TODO: Check this is 0 is free or 1 is free...
+			if(check == 0) { 
 				sprintf(reportBuf, "%s,%d", "BFREE", (i * 8 + j));
 				printf("%s\n", reportBuf); 
 				//count_check++;
@@ -133,22 +140,42 @@ void checkFreeInodes() {
 }
 
 
+char getFileType(int i_mode) {  // Helper function to get the char for file type for inode summary
+	if((0x4000 & i_mode) == 0x4000)  // directory
+		return 'd';
+	else if((0x8000 & i_mode) == 0x8000)  // file
+		return 'f';
+	else if((0xA000 & i_mode) == 0xA000)  // symbolic link
+		return 's';
+	else 
+		return '?'; // something else
+}
+
+
+char * convertToTime(time_t time) {  // Helper function to turn int time to string for inode summary
+	struct tm * timeinfo = localtime(&time);
+	snprintf(output, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
+			timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+	return output;  	
+}
+
+
 void inodeSummary() {
 	for(i = 0; i < num_inodes; i++) {
 		pread(ext2_fd, &inode, sizeof(inode), 1024 + 4*block_size + i);
 		inode_num = i;
-		inode_file_type = inode.i_version;  // TODO: CHECK THIS! ACTUALLY NEEDS TO BE A CHAR!!
-		inode_file_mode = inode.i_mode;
+		inode_file_mode = inode.i_mode;  // TODO: CHANGE INT TO OCTAL
+		inode_file_type = getFileType(inode_file_mode);  
 		inode_file_owner = inode.i_uid;
 		inode_file_group = inode.i_gid;
 		inode_link_count = inode.i_links_count;
-		inode_creation_time = inode.i_ctime;
-		inode_modification_time = inode.i_mtime;
-		inode_last_access_time = inode.i_atime;
+		inode_creation_time = convertToTime(inode.i_ctime);
+		inode_modification_time = convertToTime(inode.i_mtime);
+		inode_last_access_time = convertToTime(inode.i_atime);
 		inode_file_size = inode.i_size;
 		inode_num_blocks = inode.i_blocks;
 
-		sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
+		sprintf(reportBuf, "%s,%d,%c,%d,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
 				inode_file_owner, inode_file_group, inode_link_count, inode_creation_time, inode_modification_time,
 				inode_last_access_time, inode_file_size, inode_num_blocks);
 
