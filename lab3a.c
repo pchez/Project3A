@@ -16,7 +16,7 @@
 char reportBuf[1024];
 struct ext2_super_block sb;
 struct ext2_group_desc groupDesc;
-
+struct ext2_inode inode;
 
 /* SUPER BLOCK VARIABLES */
 
@@ -33,10 +33,19 @@ int free_blocks, free_inodes;
 int block_bitmap_blk_num, inode_bitmap_blk_num, first_inode_blk_num;
 int num_group;
 
-/* BLOCK BITMAP VARIABLES */
+/* BLOCK AND INODE BITMAP VARIABLES */
 
 char byte_buffer;
 int bit_mask, j;
+
+/* INODE VARIABLES */
+
+int inode_num, inode_file_type, inode_file_mode;
+int inode_file_owner, inode_file_group;
+int inode_link_count, inode_creation_time, inode_modification_time;
+int inode_last_access_time, inode_file_size, inode_num_blocks;
+
+/* ------------------ START OF FUNCTIONS ---------------------------------- */
 
 void superblockSummary() {
 	pread(ext2_fd, &sb, sizeof(sb), 1024);    
@@ -59,6 +68,7 @@ void superblockSummary() {
 	printf("%s\n", reportBuf);
 }
 
+
 void groupSummary() {
 	pread(ext2_fd, &groupDesc, sizeof(groupDesc), 1024+block_size);
 	num_group = 0;
@@ -77,6 +87,7 @@ void groupSummary() {
 	
 	printf("%s\n", reportBuf);
 }
+
 
 void checkFreeBlocks() {
 	memset(reportBuf, '\0', sizeof(char)*1024); // clear the array
@@ -100,6 +111,7 @@ void checkFreeBlocks() {
 		//fprintf(stdout, "NUMBER OF FREE BLOCKS IS CORRECT\n");
 }
 
+
 void checkFreeInodes() {
 	//int count_check = 0;   // for de-bugging and sanity purposes...
 	for(i = 0; i < block_size; i++) {
@@ -111,7 +123,7 @@ void checkFreeInodes() {
 			if(check == 0) {
 				sprintf(reportBuf, "%s,%d", "IFREE", (i * 8 + j));
 				printf("%s\n", reportBuf);
-				count_check++;
+				//count_check++;
 			}
 			bit_mask <<= 1;
 		}
@@ -119,6 +131,31 @@ void checkFreeInodes() {
 	//if(count_check == free_inodes)
 		//fprintf(stdout, "NUMBER OF FREE INODES IS CORRECT\n");
 }
+
+
+void inodeSummary() {
+	for(i = 0; i < num_inodes; i++) {
+		pread(ext2_fd, &inode, sizeof(inode), 1024 + 4*block_size + i);
+		inode_num = i;
+		inode_file_type = inode.i_version;  // TODO: CHECK THIS! ACTUALLY NEEDS TO BE A CHAR!!
+		inode_file_mode = inode.i_mode;
+		inode_file_owner = inode.i_uid;
+		inode_file_group = inode.i_gid;
+		inode_link_count = inode.i_links_count;
+		inode_creation_time = inode.i_ctime;
+		inode_modification_time = inode.i_mtime;
+		inode_last_access_time = inode.i_atime;
+		inode_file_size = inode.i_size;
+		inode_num_blocks = inode.i_blocks;
+
+		sprintf(reportBuf, "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
+				inode_file_owner, inode_file_group, inode_link_count, inode_creation_time, inode_modification_time,
+				inode_last_access_time, inode_file_size, inode_num_blocks);
+
+		printf("%s\n", reportBuf);
+	}
+}
+
 
 int main(int argc, char** argv) {
 	//-------------handle input argument----------------------
@@ -134,4 +171,5 @@ int main(int argc, char** argv) {
 	groupSummary();
 	checkFreeBlocks();  // parse bitmap for blocks to check for BFREE blocks to print out
 	checkFreeInodes();  // parse bitmap for inodes to check for IFREE inodes to print out
+	inodeSummary();
 }
