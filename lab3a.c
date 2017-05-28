@@ -24,15 +24,16 @@ struct ext2_inode inode;
 
 int i;
 int ext2_fd;
-int block_size, inode_size;
-int blocks_per_group, inodes_per_group;
-int num_blocks, num_inodes;
-int first_nonres_inode;
+__u32 block_size; 
+__u16 inode_size;
+__u32 blocks_per_group, inodes_per_group;
+__u32 num_blocks, num_inodes;
+__u32 first_nonres_inode;
 
 /* GROUP VARIABLES */
 
-int free_blocks, free_inodes;
-int block_bitmap_blk_num, inode_bitmap_blk_num, first_inode_blk_num;
+__u16 free_blocks, free_inodes;
+__u32 block_bitmap_blk_num, inode_bitmap_blk_num, first_inode_blk_num;
 int num_group;
 
 /* BLOCK AND INODE BITMAP VARIABLES */
@@ -44,13 +45,13 @@ int bit_mask, j;
 
 int inode_num; 
 char inode_file_type;
-int inode_file_mode;
-int inode_file_owner, inode_file_group;
-int inode_link_count; 
+__u16 inode_file_mode;
+__u16 inode_file_owner, inode_file_group;
+__u16 inode_link_count; 
 char * inode_creation_time; 
 char * inode_modification_time;
 char * inode_last_access_time; 
-int inode_file_size, inode_num_blocks;
+__u32 inode_file_size, inode_num_blocks;
 
 /* ------------------ START OF FUNCTIONS ---------------------------------- */
 
@@ -107,7 +108,7 @@ void checkFreeBlocks() {
 		for(j = 0; j < 8; j++) {
 			int check = byte_buffer & bit_mask;
 			if(check == 0) { 
-				sprintf(reportBuf, "%s,%d", "BFREE", (i * 8 + j));
+				sprintf(reportBuf, "%s,%d", "BFREE", (i * 8 + j + 1));
 				printf("%s\n", reportBuf); 
 				//count_check++;
 			} 		
@@ -128,7 +129,7 @@ void checkFreeInodes() {
 		for(j = 0; j < 8; j++) {
 			int check = byte_buffer & bit_mask;
 			if(check == 0) {
-				sprintf(reportBuf, "%s,%d", "IFREE", (i * 8 + j));
+				sprintf(reportBuf, "%s,%d", "IFREE", (i * 8 + j + 1));
 				printf("%s\n", reportBuf);
 				//count_check++;
 			}
@@ -152,7 +153,8 @@ char getFileType(int i_mode) {  // Helper function to get the char for file type
 }
 
 
-char * convertToTime(time_t time) {  // Helper function to turn int time to string for inode summary
+char * convertToTime(__u32 timeIn) {  // Helper function to turn int time to string for inode summary
+	time_t time = timeIn;
 	struct tm * timeinfo = localtime(&time);
 	snprintf(output, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
 			timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
@@ -174,12 +176,15 @@ void inodeSummary() {
 		inode_last_access_time = convertToTime(inode.i_atime);
 		inode_file_size = inode.i_size;
 		inode_num_blocks = inode.i_blocks;
-
-		sprintf(reportBuf, "%s,%d,%c,%d,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
+		fprintf(stdout, "FILE MODE = %u\n", inode_file_mode);
+		fprintf(stdout, "INODE LINK COUNT = %u\n", inode_link_count);		
+		if(inode_file_mode != 0 && inode_link_count > 0) {
+			sprintf(reportBuf, "%s,%d,%c,%d,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
 				inode_file_owner, inode_file_group, inode_link_count, inode_creation_time, inode_modification_time,
 				inode_last_access_time, inode_file_size, inode_num_blocks);
-
-		printf("%s\n", reportBuf);
+		
+			printf("%s\n", reportBuf);
+		}
 	}
 }
 
@@ -191,7 +196,7 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 	
-	ext2_fd = open("EXT2_test.img", O_RDONLY);   	
+	ext2_fd = open(argv[1], O_RDONLY);   	
 
 	//------------get summaries------------------------------
 	superblockSummary();
