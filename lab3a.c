@@ -205,14 +205,15 @@ void inodeSummary() {
 				inode_block_addr[9], inode_block_addr[10], inode_block_addr[11], inode_block_addr[12], inode_block_addr[13], inode_block_addr[14]);
 		
 			printf("%s\n", reportBuf);
-			directorySummary(i);  // Do summary for all directories for this valid inode 
+			if (S_ISDIR(inode.i_mode))
+				directorySummary(i);  // Do summary for all directories for this valid inode 
 		}
 	}
 }
 
 
 void directorySummary(int startOffset) {
-	for(k = startOffset; k < startOffset + sizeof(inode); k = k + sizeof(dirEntry) - (255 - lastDirEntrySize)) {  // TODO: FIGURE OUT what to do for indirect blocks
+	for(k = startOffset; k < startOffset + sizeof(inode); k = k + lastDirEntrySize) {  // TODO: FIGURE OUT what to do for indirect blocks
 		pread(ext2_fd, &dirEntry, sizeof(dirEntry), k);
 		dir_par_num = inode_num;
 		dir_offset = k - startOffset;
@@ -226,7 +227,7 @@ void directorySummary(int startOffset) {
 			
 		if(dir_curr_num > 0) {
 			sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dir_file_name);
-
+			
 			printf("%s\n", reportBuf);
 		}	
 	}  // For loop to traverse thru all directories  
