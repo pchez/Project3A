@@ -19,6 +19,7 @@ char output[30];  // output buffer for time!
 struct ext2_super_block sb;
 struct ext2_group_desc groupDesc;
 struct ext2_inode inode;
+struct ext2_dir_entry dirEntry;
 
 /* SUPER BLOCK VARIABLES */
 
@@ -53,6 +54,18 @@ char * inode_modification_time;
 char * inode_last_access_time; 
 __u32 inode_file_size, inode_num_blocks;
 __u32 * inode_block_addr;
+
+/* DIRECTORY VARIABLES */
+
+void directorySummary(int startOffset);
+int k, z;  // looping vars
+int dir_par_num;
+int dir_offset;
+__u32 dir_curr_num;
+__u16 dir_entry_len;
+__u8 dir_name_len;
+char * dir_file_name; 
+int lastDirEntrySize;
 
 /* ------------------ START OF FUNCTIONS ---------------------------------- */
 
@@ -172,7 +185,7 @@ void inodeSummary() {
 	for(i = 5*block_size; i < 5*block_size + num_inodes*sizeof(inode); i = i + sizeof(inode)) {
 		pread(ext2_fd, &inode, sizeof(inode), i);
 		inode_num = ((i - (5*block_size))/sizeof(inode)) + 1;
-		inode_file_mode = convertIntToOctal(inode.i_mode);  // TODO: CHANGE INT TO OCTAL
+		inode_file_mode = convertIntToOctal(inode.i_mode);  
 		inode_file_type = getFileType(inode.i_mode);  
 		inode_file_owner = inode.i_uid;
 		inode_file_group = inode.i_gid;
@@ -192,8 +205,31 @@ void inodeSummary() {
 				inode_block_addr[9], inode_block_addr[10], inode_block_addr[11], inode_block_addr[12], inode_block_addr[13], inode_block_addr[14]);
 		
 			printf("%s\n", reportBuf);
+			directorySummary(i);  // Do summary for all directories for this valid inode 
 		}
 	}
+}
+
+
+void directorySummary(int startOffset) {
+	for(k = startOffset; k < startOffset + sizeof(inode); k = k + sizeof(dirEntry) - (255 - lastDirEntrySize)) {  // TODO: FIGURE OUT what to do for indirect blocks
+		pread(ext2_fd, &dirEntry, sizeof(dirEntry), k);
+		dir_par_num = inode_num;
+		dir_offset = k - startOffset;
+		dir_curr_num = dirEntry.inode;
+		dir_entry_len = dirEntry.rec_len;
+		dir_name_len = dirEntry.name_len;
+		lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread
+		dir_file_name = (char*) malloc(sizeof(dir_name_len)+1);
+		for(z = 0; z < dir_name_len; z++) 
+			dir_file_name[z] = dirEntry.name[z];
+			
+		if(dir_curr_num > 0) {
+			sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dir_file_name);
+
+			printf("%s\n", reportBuf);
+		}	
+	}  // For loop to traverse thru all directories  
 }
 
 
