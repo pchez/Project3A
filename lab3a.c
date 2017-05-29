@@ -141,6 +141,11 @@ void checkFreeInodes() {
 }
 
 
+int convertIntToOctal(__u16 mode) {
+	return 511&mode;
+}
+
+
 char getFileType(int i_mode) {  // Helper function to get the char for file type for inode summary
 	if((0x4000 & i_mode) == 0x4000)  // directory
 		return 'd';
@@ -163,11 +168,11 @@ char * convertToTime(__u32 timeIn) {  // Helper function to turn int time to str
 
 
 void inodeSummary() {
-	for(i = 0; i < num_inodes; i++) {
-		pread(ext2_fd, &inode, sizeof(inode), 1024 + 4*block_size + i);
-		inode_num = i;
-		inode_file_mode = inode.i_mode;  // TODO: CHANGE INT TO OCTAL
-		inode_file_type = getFileType(inode_file_mode);  
+	for(i = 5*block_size; i < 5*block_size + num_inodes*sizeof(inode); i = i + sizeof(inode)) {
+		pread(ext2_fd, &inode, sizeof(inode), i);
+		inode_num = ((i - (5*block_size))/sizeof(inode)) + 1;
+		inode_file_mode = convertIntToOctal(inode.i_mode);  // TODO: CHANGE INT TO OCTAL
+		inode_file_type = getFileType(inode.i_mode);  
 		inode_file_owner = inode.i_uid;
 		inode_file_group = inode.i_gid;
 		inode_link_count = inode.i_links_count;
@@ -176,10 +181,9 @@ void inodeSummary() {
 		inode_last_access_time = convertToTime(inode.i_atime);
 		inode_file_size = inode.i_size;
 		inode_num_blocks = inode.i_blocks;
-		fprintf(stdout, "FILE MODE = %u\n", inode_file_mode);
-		fprintf(stdout, "INODE LINK COUNT = %u\n", inode_link_count);		
+		
 		if(inode_file_mode != 0 && inode_link_count > 0) {
-			sprintf(reportBuf, "%s,%d,%c,%d,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
+			sprintf(reportBuf, "%s,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
 				inode_file_owner, inode_file_group, inode_link_count, inode_creation_time, inode_modification_time,
 				inode_last_access_time, inode_file_size, inode_num_blocks);
 		
