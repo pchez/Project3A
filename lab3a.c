@@ -52,6 +52,7 @@ char * inode_creation_time;
 char * inode_modification_time;
 char * inode_last_access_time; 
 __u32 inode_file_size, inode_num_blocks;
+__u32 * inode_block_addr;
 
 /* ------------------ START OF FUNCTIONS ---------------------------------- */
 
@@ -141,7 +142,7 @@ void checkFreeInodes() {
 }
 
 
-int convertIntToOctal(__u16 mode) {
+int convertIntToOctal(__u16 mode) {  // Helper function to get the lowest 9 bits of the decimal (printing correct octal value)
 	return 511&mode;
 }
 
@@ -181,11 +182,14 @@ void inodeSummary() {
 		inode_last_access_time = convertToTime(inode.i_atime);
 		inode_file_size = inode.i_size;
 		inode_num_blocks = inode.i_blocks;
+		inode_block_addr = inode.i_block; 
 		
 		if(inode_file_mode != 0 && inode_link_count > 0) {
-			sprintf(reportBuf, "%s,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
+			sprintf(reportBuf, "%s,%d,%c,%o,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", "INODE", inode_num, inode_file_type, inode_file_mode,
 				inode_file_owner, inode_file_group, inode_link_count, inode_creation_time, inode_modification_time,
-				inode_last_access_time, inode_file_size, inode_num_blocks);
+				inode_last_access_time, inode_file_size, inode_num_blocks, inode_block_addr[0], inode_block_addr[1], inode_block_addr[2],
+				inode_block_addr[3], inode_block_addr[4], inode_block_addr[5], inode_block_addr[6], inode_block_addr[7], inode_block_addr[8],
+				inode_block_addr[9], inode_block_addr[10], inode_block_addr[11], inode_block_addr[12], inode_block_addr[13], inode_block_addr[14]);
 		
 			printf("%s\n", reportBuf);
 		}
