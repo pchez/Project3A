@@ -223,50 +223,26 @@ void inodeSummary() {
 void directorySummary(__u32 * i_block) {
 	int k;
 	lastDirEntrySize = 0;
-	for(k=0; i<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
+	for(k=0; k<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
 		if (i_block[k]==0)
 			break;
 		dir_offset = 0;
 		while(dir_offset < block_size) {
 			pread(ext2_fd, &dirEntry, sizeof(dirEntry), i_block[k]*1024 + dir_offset);
 			dir_par_num = inode_num;
-			dir_offset += lastDirEntrySize;
 			dir_curr_num = dirEntry.inode;
 			dir_entry_len = dirEntry.rec_len;
 			dir_name_len = dirEntry.name_len;
-			lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread
-			
+			lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
+	
 			if(dir_curr_num > 0) {
 				sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dirEntry.name);
-			
 				printf("%s\n", reportBuf);
 			}
+			dir_offset += lastDirEntrySize;
 		}
 	}
 }
-
-/*
-void directorySummary(int startOffset) {
-	for(k = startOffset; k < startOffset + sizeof(inode); k = k + lastDirEntrySize) {  // TODO: FIGURE OUT what to do for indirect blocks
-		pread(ext2_fd, &dirEntry, sizeof(dirEntry), k);
-		dir_par_num = inode_num;
-		dir_offset = k - startOffset;
-		dir_curr_num = dirEntry.inode;
-		dir_entry_len = dirEntry.rec_len;
-		dir_name_len = dirEntry.name_len;
-		lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread
-		dir_file_name = (char*) malloc(sizeof(dir_name_len)+1);
-		for(z = 0; z < dir_name_len; z++) 
-			dir_file_name[z] = dirEntry.name[z];
-			
-		if(dir_curr_num > 0) {
-			sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dir_file_name);
-			
-			printf("%s\n", reportBuf);
-		}	
-	}  // For loop to traverse thru all directories  
-}
-*/
 
 int main(int argc, char** argv) {
 	//-------------handle input argument----------------------
