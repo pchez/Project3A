@@ -60,12 +60,10 @@ __u32 * inode_block_addr;
 void directorySummary(__u32 * i_block);
 int k, z;  // looping vars
 int dir_par_num;
-int dir_offset;
 __u32 dir_curr_num;
 __u16 dir_entry_len;
 __u8 dir_name_len;
 char * dir_file_name; 
-int lastDirEntrySize;
 
 /* ------------------ START OF FUNCTIONS ---------------------------------- */
 
@@ -191,18 +189,18 @@ void convertToTime(__u32 i_ctime, __u32 i_mtime, __u32 i_atime, char* time_creat
 	
 }
 
-void readDirEntry(int entry_addr) {
-	pread(ext2_fd, &dirEntry, sizeof(dirEntry), entry_addr);
+int readDirEntry(int blocknum, int offset) {
+	pread(ext2_fd, &dirEntry, sizeof(dirEntry), blocknum+offset);
 	dir_par_num = inode_num;
 	dir_curr_num = dirEntry.inode;
 	dir_entry_len = dirEntry.rec_len;
-	dir_name_len = dirEntry.name_len;
-	lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
+	dir_name_len = dirEntry.name_len;		
 
 	if(dir_curr_num > 0) {
-		sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s%s%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, "'", dirEntry.name, "'");
+		sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s%s%s", "DIRENT", dir_par_num, offset, dir_curr_num, dir_entry_len, dir_name_len, "'", dirEntry.name, "'");
 		printf("%s\n", reportBuf);
 	}
+	return dir_entry_len;
 }
 
 // INDIRECT
@@ -214,7 +212,9 @@ void readDirEntry(int entry_addr) {
 void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_blocknum, int ref_blocknum, char report_type) {
 	int k;
 	int indir_num;
+	int last_dir_entry_size;
 	int offset = 0;
+
 	for (k=0; k<block_size; k+=sizeof(int)) {
 		pread(ext2_fd, &indir_num, sizeof(indir_num), ref_blocknum*block_size + k);	//read from the current block 
 		if (indir_num==0)	//if no more pointers to be read
@@ -222,10 +222,10 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 		if (level==0) {
 			
 			if (report_type=='d') {					//called from directory summary
+				
 				while (offset < block_size) {
-					readDirEntry(indir_num*block_size + offset);	//read from the block that contains the data
-					offset += lastDirEntrySize;
-					printf("offset %d\n", offset);
+					last_dir_entry_size = readDirEntry(ref_blocknum*block_size, offset);	//read from the block that contains the data
+					offset += last_dir_entry_size;
 				}
 				return;
 			}
@@ -276,7 +276,8 @@ void inodeSummary() {
 
 void directorySummary(__u32 * i_block) {
 	int k;
-	lastDirEntrySize = 0;
+	int last_dir_entry_size;
+	int dir_offset;
 	for(k=0; k<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
 		if (i_block[k]==0)
 			break;
@@ -289,8 +290,8 @@ void directorySummary(__u32 * i_block) {
 		else {
 			dir_offset = 0;
 			while(dir_offset < block_size) {
-				readDirEntry(i_block[k]*block_size + dir_offset);
-				dir_offset += lastDirEntrySize;
+				last_dir_entry_size = readDirEntry(i_block[k]*block_size, dir_offset);
+				dir_offset += last_dir_entry_size;
 			}
 		}
 	}
