@@ -49,15 +49,15 @@ char inode_file_type;
 __u16 inode_file_mode;
 __u16 inode_file_owner, inode_file_group;
 __u16 inode_link_count; 
-char * inode_creation_time; 
-char * inode_modification_time;
-char * inode_last_access_time; 
+char inode_creation_time[30]; 
+char inode_modification_time[30];
+char inode_last_access_time[30]; 
 __u32 inode_file_size, inode_num_blocks;
 __u32 * inode_block_addr;
 
 /* DIRECTORY VARIABLES */
 
-void directorySummary(int startOffset);
+void directorySummary(__u32 * i_block);
 int k, z;  // looping vars
 int dir_par_num;
 int dir_offset;
@@ -172,12 +172,23 @@ char getFileType(int i_mode) {  // Helper function to get the char for file type
 }
 
 
-char * convertToTime(__u32 timeIn) {  // Helper function to turn int time to string for inode summary
-	time_t time = timeIn;
+void convertToTime(__u32 i_ctime, __u32 i_mtime, __u32 i_atime, char* time_creat, char* time_mod, char* time_acc) {  // Helper function to turn int time to string for inode summary
+
+	time_t time = i_ctime;
 	struct tm * timeinfo = localtime(&time);
-	snprintf(output, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
-			timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
-	return output;  	
+	snprintf(time_creat, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
+	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+	time = i_mtime;
+	timeinfo = localtime(&time);
+	snprintf(time_mod, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
+	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+
+	time = i_atime;
+	timeinfo = localtime(&time);
+	snprintf(time_acc, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
+	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+	
 }
 
 
@@ -190,9 +201,7 @@ void inodeSummary() {
 		inode_file_owner = inode.i_uid;
 		inode_file_group = inode.i_gid;
 		inode_link_count = inode.i_links_count;
-		inode_creation_time = convertToTime(inode.i_ctime);
-		inode_modification_time = convertToTime(inode.i_mtime);
-		inode_last_access_time = convertToTime(inode.i_atime);
+		convertToTime(inode.i_ctime, inode.i_mtime, inode.i_atime, inode_creation_time, inode_modification_time, inode_last_access_time);
 		inode_file_size = inode.i_size;
 		inode_num_blocks = inode.i_blocks;
 		inode_block_addr = inode.i_block; 
@@ -205,34 +214,62 @@ void inodeSummary() {
 				inode_block_addr[9], inode_block_addr[10], inode_block_addr[11], inode_block_addr[12], inode_block_addr[13], inode_block_addr[14]);
 		
 			printf("%s\n", reportBuf);
-			if (S_ISDIR(inode.i_mode))	
-				directorySummary(i);  // Do summary for all directories for this valid inode 
+			if (S_ISDIR(inode.i_mode))
+				directorySummary(inode.i_block);  // Do summary for all directories for this valid inode 
+		}
+	}
+}
+
+// INDIRECT
+// I-node number of the owning file (decimal)
+// (decimal) level of indirection for the block being scanned ... 1 single indirect, 2 double indirect, 3 tripple
+// file offset (decimal) represented by the referenced block. If the referenced block is a data block, this is the logical block offset of that block within the file. If the referenced block is a single- or double-indirect block, this is the same as the logical offset of the first data block to which it refers.
+// block number of the (1,2,3) indirect block being scanned (decimal) ... not the highest level block (in the recursive scan), but the lower level block that contains the block reference reported by this entry.
+// block number of the referenced block (decimal)
+
+void indirectSummary(int level, int indirect_type, int owner_id) {
+	int k;
+	for (k=0; k<block_size; k++) {
+		if (k==0) {
+			//gather all info and write to stdout
+			sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", indirect_type, dir_offset, k, ref_block); //fix this. 1.%d or %u??? 2.dir_offset
+		} else {
+			level--;
+			indirectSummary(level, indirect_type, owner_id, indirect_blocknum);
 		}
 	}
 }
 
 
-void directorySummary(int startOffset) {
-	for(k = startOffset; k < startOffset + sizeof(inode); k = k + sizeof(dirEntry) - (255 - lastDirEntrySize)) {  // TODO: FIGURE OUT what to do for indirect blocks
-		pread(ext2_fd, &dirEntry, sizeof(dirEntry), k);
-		dir_par_num = inode_num;
-		dir_offset = k - startOffset;
-		dir_curr_num = dirEntry.inode;
-		dir_entry_len = dirEntry.rec_len;
-		dir_name_len = dirEntry.name_len;
-		lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread
-		dir_file_name = (char*) malloc(sizeof(dir_name_len)+1);
-		for(z = 0; z < dir_name_len; z++) 
-			dir_file_name[z] = dirEntry.name[z];
-			
-		if(dir_curr_num > 0) {
-			sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dir_file_name);
-
-			printf("%s\n", reportBuf);
-		}	
-	}  // For loop to traverse thru all directories  
+void directorySummary(__u32 * i_block) {
+	int k;
+	lastDirEntrySize = 0;
+	for(k=0; k<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
+		if (i_block[k]==0)
+			break;
+		if (k==12) //indirect 1
+			indirectSummary(1, 1, inode_num);
+		if (k==13)
+			indirectSummary(2, 2, inode_num);
+		if (k==14)
+			indirectSummary(3, 3, inode_num);
+		dir_offset = 0;
+		while(dir_offset < block_size) {
+			pread(ext2_fd, &dirEntry, sizeof(dirEntry), i_block[k]*1024 + dir_offset);
+			dir_par_num = inode_num;
+			dir_curr_num = dirEntry.inode;
+			dir_entry_len = dirEntry.rec_len;
+			dir_name_len = dirEntry.name_len;
+			lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
+	
+			if(dir_curr_num > 0) {
+				sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dirEntry.name);
+				printf("%s\n", reportBuf);
+			}
+			dir_offset += lastDirEntrySize;
+		}
+	}
 }
-
 
 int main(int argc, char** argv) {
 	//-------------handle input argument----------------------
