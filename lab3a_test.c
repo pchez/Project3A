@@ -192,7 +192,57 @@ void convertToTime(__u32 i_ctime, __u32 i_mtime, __u32 i_atime, char* time_creat
 }
 
 
+void readDirEntry(int entry_addr) {
+	pread(ext2_fd, &dirEntry, sizeof(dirEntry), entry_addr);
+	dir_par_num = inode_num;
+	dir_curr_num = dirEntry.inode;
+	dir_entry_len = dirEntry.rec_len;
+	dir_name_len = dirEntry.name_len;
+	lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
+
+	if(dir_curr_num > 0) {
+		sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dirEntry.name);
+		printf("%s\n", reportBuf);
+	}
+}
+
+
+// INDIRECT
+// I-node number of the owning file (decimal)
+// (decimal) level of indirection for the block being scanned ... 1 single indirect, 2 double indirect, 3 tripple
+// file offset (decimal) represented by the referenced block. If the referenced block is a data block, this is the logical block offset of that block within the file. If the referenced block is a single- or double-indirect block, this is the same as the logical offset of the first data block to which it refers.
+// block number of the (1,2,3) indirect block being scanned (decimal) ... not the highest level block (in the recursive scan), but the lower level block that contains the block reference reported by this entry.
+// block number of the referenced block (decimal)
+void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_blocknum, int ref_blocknum, char report_type) {
+	int k;
+	int indir_num;
+	int offset = 0;
+	for (k=0; k<block_size; k+=sizeof(int)) {
+		pread(ext2_fd, &indir_num, sizeof(indir_num), ref_blocknum*block_size + k);	//read from the current block 
+		if (indir_num==0)	//if no more pointers to be read
+			return;
+		if (level==0) {
+			//gather all info and write to stdout
+			if (report_type=='d') {					//called from directory summary
+				while (offset < block_size) {
+					readDirEntry(indir_num*block_size + offset);	//read from the block that contains the data
+					offset += lastDirEntrySize;
+				}
+			}
+			if (report_type=='i') {			//called from indirect summary
+				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, indirect_type, offset, scanned_blocknum, ref_blocknum); //fix this. 1.%d or %u??? 2.dir_offset
+				printf("%s\n", reportBuf);
+				return;
+			} 
+		} else {
+			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type);
+		}
+	}
+}
+
+
 void inodeSummary() {
+	int k;
 	for(i = 5*block_size; i < 5*block_size + num_inodes*sizeof(inode); i = i + sizeof(inode)) {
 		pread(ext2_fd, &inode, sizeof(inode), i);
 		inode_num = ((i - (5*block_size))/sizeof(inode)) + 1;
@@ -216,29 +266,14 @@ void inodeSummary() {
 			printf("%s\n", reportBuf);
 			if (S_ISDIR(inode.i_mode))
 				directorySummary(inode.i_block);  // Do summary for all directories for this valid inode 
+			
+			indirectEntry(1, 1, inode_num, 0, inode_block_addr[12], 'i');
+			indirectEntry(2, 2, inode_num, 0, inode_block_addr[13], 'i');
+			indirectEntry(3, 3, inode_num, 0, inode_block_addr[14], 'i');
 		}
 	}
 }
 
-// INDIRECT
-// I-node number of the owning file (decimal)
-// (decimal) level of indirection for the block being scanned ... 1 single indirect, 2 double indirect, 3 tripple
-// file offset (decimal) represented by the referenced block. If the referenced block is a data block, this is the logical block offset of that block within the file. If the referenced block is a single- or double-indirect block, this is the same as the logical offset of the first data block to which it refers.
-// block number of the (1,2,3) indirect block being scanned (decimal) ... not the highest level block (in the recursive scan), but the lower level block that contains the block reference reported by this entry.
-// block number of the referenced block (decimal)
-
-void indirectSummary(int level, int indirect_type, int owner_id) {
-	int k;
-	for (k=0; k<block_size; k++) {
-		if (k==0) {
-			//gather all info and write to stdout
-			sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", indirect_type, dir_offset, k, ref_block); //fix this. 1.%d or %u??? 2.dir_offset
-		} else {
-			level--;
-			indirectSummary(level, indirect_type, owner_id, indirect_blocknum);
-		}
-	}
-}
 
 
 void directorySummary(__u32 * i_block) {
@@ -247,26 +282,19 @@ void directorySummary(__u32 * i_block) {
 	for(k=0; k<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
 		if (i_block[k]==0)
 			break;
-		if (k==12) //indirect 1
-			indirectSummary(1, 1, inode_num);
-		if (k==13)
-			indirectSummary(2, 2, inode_num);
-		if (k==14)
-			indirectSummary(3, 3, inode_num);
-		dir_offset = 0;
-		while(dir_offset < block_size) {
-			pread(ext2_fd, &dirEntry, sizeof(dirEntry), i_block[k]*1024 + dir_offset);
-			dir_par_num = inode_num;
-			dir_curr_num = dirEntry.inode;
-			dir_entry_len = dirEntry.rec_len;
-			dir_name_len = dirEntry.name_len;
-			lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
-	
-			if(dir_curr_num > 0) {
-				sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dirEntry.name);
-				printf("%s\n", reportBuf);
+		
+		if (k==12) 
+			indirectEntry(1, 1, inode_num, 0, i_block[k], 'd');
+		else if (k==13)
+			indirectEntry(2, 2, inode_num, 0, i_block[k], 'd');
+		else if (k==14)
+			indirectEntry(3, 3, inode_num, 0, i_block[k], 'd');
+		else {
+			dir_offset = 0;
+			while(dir_offset < block_size) {
+				readDirEntry(i_block[k]*block_size + dir_offset);
+				dir_offset += lastDirEntrySize;
 			}
-			dir_offset += lastDirEntrySize;
 		}
 	}
 }
