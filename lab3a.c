@@ -1,3 +1,9 @@
+/*
+NAME: Priscilla Cheng AND Saurabh Deo
+EMAIL: priscillaccheng@gmail.com AND saurabhdeo27@gmail.com
+ID: 404159386 AND 404616605
+*/
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -216,9 +222,6 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 	int offset = 0;
 
 	for (k=0; k<block_size; k+=sizeof(int)) {
-		pread(ext2_fd, &indir_num, sizeof(indir_num), ref_blocknum*block_size + k);	//read from the current block 
-		if (indir_num==0)	//if no more pointers to be read
-			return;
 		if (level==0) {
 			
 			if (report_type=='d') {					//called from directory summary
@@ -227,15 +230,21 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 					last_dir_entry_size = readDirEntry(ref_blocknum*block_size, offset);	//read from the block that contains the data
 					offset += last_dir_entry_size;
 				}
-				return;
 			}
 			//gather all info and write to stdout
-			if (report_type=='i') {			//called from indirect summary
+			else if (report_type=='i') {			//called from indirect summary
 				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, indirect_type, offset, scanned_blocknum, ref_blocknum); //fix this. 1.%d or %u??? 2.dir_offset
 				printf("%s\n", reportBuf);
-				return;
-			} 
-		} else {
+			}
+			return;
+		} 
+		pread(ext2_fd, &indir_num, sizeof(indir_num), ref_blocknum*block_size + k);	//read from the current block 	
+		if (indir_num==0) {	//if no more pointers to be read
+			//fprintf(stdout, "EXITS BECAUSE NO MORE POINTERS TO BE READ!\n");
+			return;
+		}	
+		else {
+			//fprintf(stdout, "LEVEL CURRENTLY IN BEFORE RECURSION = %d\n", level);
 			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type);
 		}
 	}
@@ -300,11 +309,15 @@ void directorySummary(__u32 * i_block) {
 int main(int argc, char** argv) {
 	//-------------handle input argument----------------------
 	if (argc < 2 || strstr(argv[1], ".img")==NULL) {
-		printf("Not a valid filesystem\n");
+		fprintf(stderr, "Not a valid filesystem\n");
 		exit(1);
 	}
 	
-	ext2_fd = open(argv[1], O_RDONLY);   	
+	ext2_fd = open(argv[1], O_RDONLY);
+	if(ext2_fd < 0) {
+		fprintf(stderr, "ERROR: Could not open image file\n");
+		exit(1);
+	}   	
 
 	//------------get summaries------------------------------
 	superblockSummary();
