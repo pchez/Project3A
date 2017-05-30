@@ -223,7 +223,7 @@ void inodeSummary() {
 void directorySummary(__u32 * i_block) {
 	int k;
 	lastDirEntrySize = 0;
-	for(k=0; k<EXT2_N_BLOCKS; k++) {	//loop through the i_block structure
+	for(k=0; k<EXT2_NDIR_BLOCKS; k++) {	//loop through the i_block structure
 		if (i_block[k]==0)
 			break;
 		dir_offset = 0;
@@ -234,9 +234,9 @@ void directorySummary(__u32 * i_block) {
 			dir_entry_len = dirEntry.rec_len;
 			dir_name_len = dirEntry.name_len;
 			lastDirEntrySize = dir_entry_len;  // update the size of this entry for next k value for pread		
-	
+
 			if(dir_curr_num > 0) {
-				sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, dirEntry.name);
+				sprintf(reportBuf, "%s,%d,%d,%u,%u,%u,%s%s%s", "DIRENT", dir_par_num, dir_offset, dir_curr_num, dir_entry_len, dir_name_len, "'", dirEntry.name, "'");
 				printf("%s\n", reportBuf);
 			}
 			dir_offset += lastDirEntrySize;
