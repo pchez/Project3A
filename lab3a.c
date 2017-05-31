@@ -217,7 +217,7 @@ int readDirEntry(int blocknum, int offset) {
 // file offset (decimal) represented by the referenced block. If the referenced block is a data block, this is the logical block offset of that block within the file. If the referenced block is a single- or double-indirect block, this is the same as the logical offset of the first data block to which it refers.
 // block number of the (1,2,3) indirect block being scanned (decimal) ... not the highest level block (in the recursive scan), but the lower level block that contains the block reference reported by this entry.
 // block number of the referenced block (decimal)
-void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_blocknum, int ref_blocknum, char report_type) {
+void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_blocknum, int ref_blocknum, char report_type, int currently_accumulated_offset) {
 	int k;
 	int indir_num;
 	int last_dir_entry_size;
@@ -241,10 +241,19 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 		if (indir_num==0) {	//if no more pointers to be read
 			//fprintf(stdout, "EXITS BECAUSE NO MORE POINTERS TO BE READ!\n");
 			return;
-		}	
-		else {
+		}
+		else {		
+			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type, file_offset);
+
+			if(indirect_type == 1)
+				file_offset = 12 + k/sizeof(int);
+			if(indirect_type == 2)
+				file_offset = 12 + 256 + k/sizeof(int)*256;
+			if(indirect_type == 3)
+				file_offset = 12 + 256 + 256*256 + k/sizeof(int)*256*256; 
+				 
+			
 			//fprintf(stdout, "LEVEL CURRENTLY IN BEFORE RECURSION = %d\n", level);
-			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type);
 			if (report_type=='i') {
 				//file_offset = getFileOffset(ref_blocknum, indir_num, k, indirect_type);
 				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, level, file_offset, ref_blocknum, indir_num); //fix this. 1.%d or %u??? 2.dir_offset
@@ -280,9 +289,9 @@ void inodeSummary() {
 			if (S_ISDIR(inode.i_mode))
 				directorySummary(inode.i_block);  // Do summary for all directories for this valid inode 
 			
-			indirectEntry(1, 1, inode_num, 0, inode_block_addr[12], 'i');
-			indirectEntry(2, 2, inode_num, 0, inode_block_addr[13], 'i');
-			indirectEntry(3, 3, inode_num, 0, inode_block_addr[14], 'i');
+			indirectEntry(1, 1, inode_num, 0, inode_block_addr[12], 'i', 0);
+			indirectEntry(2, 2, inode_num, 0, inode_block_addr[13], 'i', 0);
+			indirectEntry(3, 3, inode_num, 0, inode_block_addr[14], 'i', 0);
 		}
 	}
 }
@@ -295,11 +304,11 @@ void directorySummary(__u32 * i_block) {
 		if (i_block[k]==0)
 			break;
 		if (k==12) 
-			indirectEntry(1, 1, inode_num, 0, i_block[k], 'd');
+			indirectEntry(1, 1, inode_num, 0, i_block[k], 'd', 0);
 		else if (k==13)
-			indirectEntry(2, 2, inode_num, 0, i_block[k], 'd');
+			indirectEntry(2, 2, inode_num, 0, i_block[k], 'd', 0);
 		else if (k==14)
-			indirectEntry(3, 3, inode_num, 0, i_block[k], 'd');
+			indirectEntry(3, 3, inode_num, 0, i_block[k], 'd', 0);
 		else {
 			dir_offset = 0;
 			while(dir_offset < block_size) {
