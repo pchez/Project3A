@@ -209,6 +209,8 @@ int readDirEntry(int blocknum, int offset) {
 	return dir_entry_len;
 }
 
+
+
 // INDIRECT
 // I-node number of the owning file (decimal)
 // (decimal) level of indirection for the block being scanned ... 1 single indirect, 2 double indirect, 3 tripple
@@ -220,12 +222,10 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 	int indir_num;
 	int last_dir_entry_size;
 	int offset = 0;
-
+	int file_offset = 0;
 	for (k=0; k<block_size; k+=sizeof(int)) {
 		if (level==0) {
-			
-			if (report_type=='d') {					//called from directory summary
-				
+			if (report_type=='d') {					//called from directory summary	
 				while (offset < block_size) {
 					last_dir_entry_size = readDirEntry(ref_blocknum*block_size, offset);	//read from the block that contains the data
 					offset += last_dir_entry_size;
@@ -233,8 +233,7 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 			}
 			//gather all info and write to stdout
 			else if (report_type=='i') {			//called from indirect summary
-				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, indirect_type, offset, scanned_blocknum, ref_blocknum); //fix this. 1.%d or %u??? 2.dir_offset
-				printf("%s\n", reportBuf);
+				return;
 			}
 			return;
 		} 
@@ -246,6 +245,11 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 		else {
 			//fprintf(stdout, "LEVEL CURRENTLY IN BEFORE RECURSION = %d\n", level);
 			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type);
+			if (report_type=='i') {
+				//file_offset = getFileOffset(ref_blocknum, indir_num, k, indirect_type);
+				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, indirect_type, file_offset, ref_blocknum, indir_num); //fix this. 1.%d or %u??? 2.dir_offset
+				printf("%s\n", reportBuf);
+			}
 		}
 	}
 }
