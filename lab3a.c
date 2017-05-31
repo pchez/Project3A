@@ -179,17 +179,17 @@ char getFileType(int i_mode) {  // Helper function to get the char for file type
 void convertToTime(__u32 i_ctime, __u32 i_mtime, __u32 i_atime, char* time_creat, char* time_mod, char* time_acc) {  // Helper function to turn int time to string for inode summary
 
 	time_t time = i_ctime;
-	struct tm * timeinfo = localtime(&time);
+	struct tm * timeinfo = gmtime(&time);
 	snprintf(time_creat, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
 	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
 	time = i_mtime;
-	timeinfo = localtime(&time);
+	timeinfo = gmtime(&time);
 	snprintf(time_mod, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
 	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
 	time = i_atime;
-	timeinfo = localtime(&time);
+	timeinfo = gmtime(&time);
 	snprintf(time_acc, 30, "%02d/%02d/%02d %02d:%02d:%02d", timeinfo->tm_mon+1, timeinfo->tm_mday, timeinfo->tm_year%100,
 	timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 	
@@ -338,4 +338,5 @@ int main(int argc, char** argv) {
 	checkFreeBlocks();  // parse bitmap for blocks to check for BFREE blocks to print out
 	checkFreeInodes();  // parse bitmap for inodes to check for IFREE inodes to print out
 	inodeSummary();
+	exit(0);
 }
