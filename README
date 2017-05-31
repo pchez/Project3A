@@ -9,5 +9,8 @@ SOURCES:
 1) https://linux.die.net/man/8/debugfs
 
 INCLUDED FILES:
-
-
+1) ext2_fs.h: header file for the linux ext2 file system
+2) lab3a.c: source code for the project
+3) README: explanation of sources and included files
+4) Makefile: makefile with targets lab3a (builds program), clean, and dist
+ 
