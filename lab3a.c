@@ -247,7 +247,7 @@ void indirectEntry(int level, int indirect_type, int owning_inode, int scanned_b
 			indirectEntry(level-1, indirect_type, owning_inode, ref_blocknum, indir_num, report_type);
 			if (report_type=='i') {
 				//file_offset = getFileOffset(ref_blocknum, indir_num, k, indirect_type);
-				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, indirect_type, file_offset, ref_blocknum, indir_num); //fix this. 1.%d or %u??? 2.dir_offset
+				sprintf(reportBuf, "%s,%d,%d,%d,%d,%d", "INDIRECT", owning_inode, level, file_offset, ref_blocknum, indir_num); //fix this. 1.%d or %u??? 2.dir_offset
 				printf("%s\n", reportBuf);
 			}
 		}
